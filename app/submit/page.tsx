@@ -7,6 +7,7 @@ export default function () {
   const [image, setImage] = useState<string | null>(null);
   const [title, setTitle] = useState<string>('');
   const [price, setPrice] = useState<string>('');
+  const [supply, setSupply] = useState<string>('');
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -64,6 +65,17 @@ export default function () {
             type="text"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
+            className="border border-black px-4 py-2"
+          />
+        </div>
+      )}
+      {image && (
+        <div className="mt-4">
+          <label className="text-black">Supply</label>
+          <input
+            type="text"
+            value={supply}
+            onChange={(e) => setSupply(e.target.value)}
             className="border border-black px-4 py-2"
           />
         </div>
