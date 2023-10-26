@@ -4,8 +4,8 @@ import Image from 'next/image';
 import { NFTStorage } from 'nft.storage';
 import { ethers } from 'ethers';
 
-const nftStorage = new NFTStorage({ token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDQwNDA3NzY4RDU5MWMyNGNiOGRhMzljOTA2MjUxYWQ2RWE5NzdFYTQiLCJpc3MiOiJuZnQtc3RvcmFnZSIsImlhdCI6MTY5ODI2NjIxOTgyNywibmFtZSI6Im1lbWV0ZWNoIn0.qsxIVSmWC5RldmAJWZ1ODEUp9-_TkDwf7kNIw6yvPuc' });
-const contractAddress = '0xf5fdD8C1BD4A3E936B9CE8bC3a324333064fe6a2';
+const nftStorage = new NFTStorage({ token: 'YOUR_NFT_STORAGE_TOKEN' });
+const contractAddress = '0xf5fdD8C1BD4A3E936B9CE8bC3a324333064fe6a2'; // Replace with your contract address
 const contractABI = [
 	{
 		"inputs": [
@@ -393,7 +393,7 @@ const contractABI = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-]; // Replace with your contract's ABI
+]
 
 export default function YourComponent() {
   const [image, setImage] = useState<File | null>(null);
@@ -440,41 +440,27 @@ export default function YourComponent() {
     }
 
     try {
-      const metadata = {
-        name: title,
-        image,
-        price,
-        supply,
-      };
-      await mintNFT(metadata);
-      alert('Meme NFT minted successfully!');
-    } catch (error) {
-      console.error(error);
-      alert('Failed to mint Meme NFT: ' + (error as Error).message);
-    }
-  };
-
-  const mintNFT = async (metadata: { name: string; image: File; price: string; supply: string }) => {
-    try {
-      const metadataURL = await nftStorage.store({
-        name: metadata.name,
-        image: metadata.image,
-        description: ''
-      });
-
       if (window.ethereum) {
-        await window.ethereum.enable();
-        const provider = new ethers.JsonRpcProvider('https://eth-sepolia.g.alchemy.com/v2/9Ioq0yC4YN1YcfPwq--OTu0TQA0CNo5n'); // Use JsonRpcProvider
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
-        const contract = new ethers.Contract(contractAddress, contractABI, await signer);
+        const contract = new ethers.Contract(contractAddress, contractABI, signer);
 
-        await contract.mintNFT(metadataURL, metadata.supply);
+        const metadataURL = await nftStorage.store({
+          name: title,
+          image,
+          description: ''
+        });
+
+        const transaction = await contract.mintNFT(metadataURL, price, supply);
+        await transaction.wait();
+        alert('Meme NFT minted successfully!');
       } else {
-        alert('Please install and connect to a Web3 wallet to use this application.');
+        alert('Please install and connect to a Web3 wallet (e.g., MetaMask) to use this application.');
       }
     } catch (error) {
       console.error('Error minting NFT:', error);
-      alert('Failed to mint Meme NFT: ' + (error as Error).message);
+      alert('Failed to mint Meme NFT');
     }
   };
 
