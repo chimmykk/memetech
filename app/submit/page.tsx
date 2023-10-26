@@ -1,11 +1,15 @@
 "use client"
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import Image from 'next/image';
-import { NFTStorage } from 'nft.storage';
+import { NFTStorage, File } from 'nft.storage';
 import { ethers } from 'ethers';
 
-const nftStorage = new NFTStorage({ token: 'YOUR_NFT_STORAGE_TOKEN' });
+const nftStorage = new NFTStorage({
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDQwNDA3NzY4RDU5MWMyNGNiOGRhMzljOTA2MjUxYWQ2RWE5NzdFYTQiLCJpc3MiOiJuZnQtc3RvcmFnZSIsImlhdCI6MTY5ODI2NjIxOTgyNywibmFtZSI6Im1lbWV0ZWNoIn0.qsxIVSmWC5RldmAJWZ1ODEUp9-_TkDwf7kNIw6yvPuc', // Replace with your NFT.storage token
+});
+
 const contractAddress = '0xf5fdD8C1BD4A3E936B9CE8bC3a324333064fe6a2'; // Replace with your contract address
+// Your contract ABI
 const contractABI = [
 	{
 		"inputs": [
@@ -401,37 +405,31 @@ export default function YourComponent() {
   const [price, setPrice] = useState<string>('');
   const [supply, setSupply] = useState<string>('');
 
-  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target) {
-          const base64Data = e.target.result as string;
-          const blob = dataURLtoBlob(base64Data);
-          setImage(new File([blob], file.name, { type: file.type }));
-        }
-      };
-      reader.readAsDataURL(file);
+      setImage(file);
     } else {
       setImage(null);
     }
   };
 
-  function dataURLtoBlob(dataURL: string): Blob {
-    const parts = dataURL.split(';base64,');
-    const contentType = parts[0].split(':')[1];
-    const byteCharacters = atob(parts[1]);
-    const byteArrays = [];
+  const uploadImage = async (imageFile: File) => {
+    try {
+      const imageBlob = new Blob([imageFile], { type: imageFile.type });
 
-    for (let offset = 0; offset < byteCharacters.length; offset++) {
-      const charCode = byteCharacters.charCodeAt(offset);
-      byteArrays.push(charCode);
+      const metadata = await nftStorage.store({
+        name: title,
+        description: '', // Add a description if needed
+        image: new File([imageBlob], title + '.jpg', { type: 'image/jpeg' }),
+      });
+
+      return metadata.url;
+    } catch (error) {
+      console.error('Error uploading image to NFT.Storage:', error);
+      return null;
     }
-
-    const byteArray = new Uint8Array(byteArrays);
-    return new Blob([byteArray], { type: contentType });
-  }
+  };
 
   const handleSubmitMeme = async () => {
     if (!image || !title || !price || !supply) {
@@ -446,15 +444,30 @@ export default function YourComponent() {
         const signer = provider.getSigner();
         const contract = new ethers.Contract(contractAddress, contractABI, signer);
 
-        const metadataURL = await nftStorage.store({
-          name: title,
-          image,
-          description: ''
-        });
+        const imageURL = await uploadImage(image);
 
-        const transaction = await contract.mintNFT(metadataURL, price, supply);
-        await transaction.wait();
-        alert('Meme NFT minted successfully!');
+        if (!imageURL) {
+          alert('Failed to upload image to NFT.Storage');
+          return;
+        }
+
+        // Call the 'listImageForSale' function on the contract with the required parameters
+        const transaction = await contract.listImageForSale(
+          imageURL,
+          ethers.utils.parseUnits(price, 'ether'),
+          ethers.utils.parseUnits(supply, 'wei'),
+          title
+        );
+
+        // Wait for the transaction to be mined
+        const receipt = await transaction.wait();
+
+        // Check if the transaction was successful
+        if (receipt.status === 1) {
+          alert('Meme NFT minted successfully!');
+        } else {
+          alert('Failed to mint Meme NFT. Transaction failed.');
+        }
       } else {
         alert('Please install and connect to a Web3 wallet (e.g., MetaMask) to use this application.');
       }
@@ -470,21 +483,21 @@ export default function YourComponent() {
 
   return (
     <main className="py-12 px-32">
-      {!image ? (
-        <label
-          htmlFor="imageUpload"
-          className="text-black border border-black px-4 py-2 inline-flex items-center space-x-2 cursor-pointer"
-        >
-          <span>Select Image</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            style={{ display: 'none' }}
-            id="imageUpload"
-          />
-        </label>
-      ) : (
+      <label
+        htmlFor="imageUpload"
+        className="text-black border border-black px-4 py-2 inline-flex items-center space-x-2 cursor-pointer"
+      >
+        <span>Select Image</span>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          style={{ display: 'none' }}
+          id="imageUpload"
+        />
+      </label>
+
+      {image && (
         <div className="w-32 my-2 rounded-lg overflow-hidden h-32 border border-red-500">
           <Image src={URL.createObjectURL(image)} alt="Uploaded" width={1000} height={1000} className="w-full rounded-lg object-center h-full" />
         </div>
@@ -513,6 +526,7 @@ export default function YourComponent() {
           />
         </div>
       )}
+
       {image && (
         <div className="mt-4">
           <label className="text-black">Supply</label>
